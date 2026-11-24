@@ -17,9 +17,29 @@ fn timestamps_must_increase_per_track() {
     let a = m.add_audio_track(AudioTrack::opus(2, 0)).unwrap();
     m.write_frame(a, &OPUS_SILENCE, 20_000_000, true).unwrap();
     let e = m.write_frame(a, &OPUS_SILENCE, 20_000_000, true).unwrap_err();
-    assert!(matches!(e, Error::TimestampNotIncreasing { track: 1, previous: 20, got: 20 }), "{e:?}");
+    assert!(
+        matches!(
+            e,
+            Error::TimestampNotIncreasing {
+                track: 1,
+                previous: 20,
+                got: 20
+            }
+        ),
+        "{e:?}"
+    );
     let e = m.write_frame(a, &OPUS_SILENCE, 10_000_000, true).unwrap_err();
-    assert!(matches!(e, Error::TimestampNotIncreasing { track: 1, previous: 20, got: 10 }), "{e:?}");
+    assert!(
+        matches!(
+            e,
+            Error::TimestampNotIncreasing {
+                track: 1,
+                previous: 20,
+                got: 10
+            }
+        ),
+        "{e:?}"
+    );
     // Below one tick apart rounds to the same tick.
     let e = m.write_frame(a, &OPUS_SILENCE, 20_999_999, true).unwrap_err();
     assert!(matches!(e, Error::TimestampNotIncreasing { .. }), "{e:?}");
@@ -43,21 +63,51 @@ fn tracks_lock_at_the_first_frame() {
     let mut m = Muxer::new(Vec::new(), Options::new()).unwrap();
     let v = m.add_video_track(vp8()).unwrap();
     m.write_frame(v, &[1], 0, true).unwrap();
-    assert!(matches!(m.add_audio_track(AudioTrack::opus(2, 0)), Err(Error::TracksLocked)));
+    assert!(matches!(
+        m.add_audio_track(AudioTrack::opus(2, 0)),
+        Err(Error::TracksLocked)
+    ));
 }
 
 #[test]
 fn bad_tracks_and_frames_are_refused() {
     let mut m = Muxer::new(Vec::new(), Options::new()).unwrap();
-    assert!(matches!(m.add_video_track(VideoTrack::new(VideoCodec::Av1, 64, 48)), Err(Error::MissingCodecPrivate)));
-    assert!(matches!(m.add_video_track(VideoTrack::new(VideoCodec::Vp8, 0, 48)), Err(Error::InvalidConfig(_))));
-    assert!(matches!(m.add_video_track(vp8().with_codec_private(vec![1])), Err(Error::InvalidConfig(_))));
-    assert!(matches!(m.add_video_track(vp8().with_uid(0)), Err(Error::InvalidConfig(_))));
-    assert!(matches!(m.add_video_track(vp8().with_language("")), Err(Error::InvalidConfig(_))));
-    assert!(matches!(m.add_audio_track(AudioTrack::opus(3, 0)), Err(Error::InvalidConfig(_))));
-    assert!(matches!(m.add_audio_track(AudioTrack::opus(0, 0)), Err(Error::InvalidConfig(_))));
-    assert!(matches!(m.add_audio_track(AudioTrack::opus_with_head(b"OpusHead".to_vec())), Err(Error::InvalidConfig(_))));
-    assert!(matches!(m.add_audio_track(AudioTrack::vorbis(vec![1, 2, 3], vec![1], vec![1])), Err(Error::InvalidConfig(_))));
+    assert!(matches!(
+        m.add_video_track(VideoTrack::new(VideoCodec::Av1, 64, 48)),
+        Err(Error::MissingCodecPrivate)
+    ));
+    assert!(matches!(
+        m.add_video_track(VideoTrack::new(VideoCodec::Vp8, 0, 48)),
+        Err(Error::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        m.add_video_track(vp8().with_codec_private(vec![1])),
+        Err(Error::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        m.add_video_track(vp8().with_uid(0)),
+        Err(Error::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        m.add_video_track(vp8().with_language("")),
+        Err(Error::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        m.add_audio_track(AudioTrack::opus(3, 0)),
+        Err(Error::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        m.add_audio_track(AudioTrack::opus(0, 0)),
+        Err(Error::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        m.add_audio_track(AudioTrack::opus_with_head(b"OpusHead".to_vec())),
+        Err(Error::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        m.add_audio_track(AudioTrack::vorbis(vec![1, 2, 3], vec![1], vec![1])),
+        Err(Error::InvalidConfig(_))
+    ));
     // Family 1 with its mapping table is accepted.
     let mut head = opus_head(6, 312, 48_000, 0);
     head[18] = 1;
@@ -71,7 +121,10 @@ fn bad_tracks_and_frames_are_refused() {
     other.add_audio_track(AudioTrack::opus(2, 0)).unwrap();
     let second = other.add_audio_track(AudioTrack::opus(2, 0)).unwrap();
     assert_eq!(foreign.number(), 1);
-    assert!(matches!(m.write_frame(second, &OPUS_SILENCE, 0, true), Err(Error::UnknownTrack)));
+    assert!(matches!(
+        m.write_frame(second, &OPUS_SILENCE, 0, true),
+        Err(Error::UnknownTrack)
+    ));
 }
 
 #[test]
@@ -86,7 +139,10 @@ fn too_many_tracks_is_refused() {
     for _ in 0..126 {
         m.add_audio_track(AudioTrack::opus(1, 0)).unwrap();
     }
-    assert!(matches!(m.add_audio_track(AudioTrack::opus(1, 0)), Err(Error::TooManyTracks)));
+    assert!(matches!(
+        m.add_audio_track(AudioTrack::opus(1, 0)),
+        Err(Error::TooManyTracks)
+    ));
 }
 
 #[test]
@@ -134,15 +190,28 @@ fn an_io_error_poisons_the_muxer() {
     let e = failed.expect("the writer should fail");
     assert!(matches!(e, Error::Io(_)), "{e:?}");
     assert!(std::error::Error::source(&e).is_some());
-    assert!(matches!(m.write_frame(a, &[9u8; 50], 10_000_000_000, true), Err(Error::Poisoned)));
+    assert!(matches!(
+        m.write_frame(a, &[9u8; 50], 10_000_000_000, true),
+        Err(Error::Poisoned)
+    ));
     assert!(matches!(m.flush(), Err(Error::Poisoned)));
-    assert!(matches!(m.add_audio_track(AudioTrack::opus(2, 0)), Err(Error::Poisoned)));
+    assert!(matches!(
+        m.add_audio_track(AudioTrack::opus(2, 0)),
+        Err(Error::Poisoned)
+    ));
     assert!(matches!(m.finish(), Err(Error::Poisoned)));
 }
 
 #[test]
 fn errors_display_plainly() {
-    let e = Error::TimestampNotIncreasing { track: 2, previous: 5, got: 5 };
-    assert_eq!(e.to_string(), "track 2: timestamp 5 is not after the previous frame's 5 (in timestamp-scale ticks)");
+    let e = Error::TimestampNotIncreasing {
+        track: 2,
+        previous: 5,
+        got: 5,
+    };
+    assert_eq!(
+        e.to_string(),
+        "track 2: timestamp 5 is not after the previous frame's 5 (in timestamp-scale ticks)"
+    );
     let _ = Muxer::new_seekable(Cursor::new(Vec::new()), Options::default()).unwrap();
 }

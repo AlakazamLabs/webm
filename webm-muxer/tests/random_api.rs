@@ -141,12 +141,18 @@ fn run(seed: u64) {
     assert_eq!(d.tracks.len(), ntracks);
     assert_eq!(d.frames.len(), accepted.len(), "seed {seed:#x}");
     for (f, a) in d.frames.iter().zip(&accepted) {
-        assert_eq!((f.track, f.ticks, f.keyframe, f.data.len(), f.data[0]), (a.track, a.ticks, a.keyframe, a.len, a.first));
+        assert_eq!(
+            (f.track, f.ticks, f.keyframe, f.data.len(), f.data[0]),
+            (a.track, a.ticks, a.keyframe, a.len, a.first)
+        );
     }
     if seekable {
         assert!(d.segment_known_size);
         for cue in &d.cues {
-            assert!(d.clusters.iter().any(|c| c.offset == cue.cluster && c.timestamp == cue.time));
+            assert!(d
+                .clusters
+                .iter()
+                .any(|c| c.offset == cue.cluster && c.timestamp == cue.time));
         }
     }
 }

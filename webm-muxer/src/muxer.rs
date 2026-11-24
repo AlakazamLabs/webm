@@ -319,7 +319,13 @@ impl<W: Write> Muxer<W> {
     /// Timestamps must increase on each track and must not go back across
     /// tracks (write frames in time order). At equal timestamps, write a
     /// video keyframe before the audio, so the audio joins its cluster.
-    pub fn write_frame(&mut self, track: TrackId, frame: &[u8], timestamp_ns: u64, keyframe: bool) -> Result<(), Error> {
+    pub fn write_frame(
+        &mut self,
+        track: TrackId,
+        frame: &[u8],
+        timestamp_ns: u64,
+        keyframe: bool,
+    ) -> Result<(), Error> {
         self.write_frame_with(track, frame, timestamp_ns, FrameOptions::new(keyframe))
     }
 
@@ -327,7 +333,13 @@ impl<W: Write> Muxer<W> {
     /// padding. A frame with either is written as a `BlockGroup` (with a
     /// `ReferenceBlock` to the track's previous frame when it isn't a
     /// keyframe); every other frame as a `SimpleBlock`.
-    pub fn write_frame_with(&mut self, track: TrackId, frame: &[u8], timestamp_ns: u64, options: FrameOptions) -> Result<(), Error> {
+    pub fn write_frame_with(
+        &mut self,
+        track: TrackId,
+        frame: &[u8],
+        timestamp_ns: u64,
+        options: FrameOptions,
+    ) -> Result<(), Error> {
         if self.poisoned {
             return Err(Error::Poisoned);
         }
@@ -359,7 +371,11 @@ impl<W: Write> Muxer<W> {
         }
         let keyframe = options.keyframe || !state.video;
         let duration_ticks = options.duration_ns.map(|d| d / scale);
-        let reference = if keyframe { None } else { Some(state.last.map_or(0, |p| p as i64 - ticks as i64)) };
+        let reference = if keyframe {
+            None
+        } else {
+            Some(state.last.map_or(0, |p| p as i64 - ticks as i64))
+        };
         let group = options.duration_ns.is_some() || options.discard_padding_ns.is_some();
 
         // The extras that follow the Block in a BlockGroup.

@@ -139,11 +139,20 @@ struct Head {
 impl<'a> R<'a> {
     /// Reads a header at `at`; `Ok(None)` when the bytes run out.
     fn head(&self, at: usize, limit: usize) -> Res<Option<Head>> {
-        let Some((idv, il)) = id(&self.b[..limit], at)? else { return Ok(None) };
-        let Some((size, sl, unknown)) = vint(&self.b[..limit], at + il)? else { return Ok(None) };
+        let Some((idv, il)) = id(&self.b[..limit], at)? else {
+            return Ok(None);
+        };
+        let Some((size, sl, unknown)) = vint(&self.b[..limit], at + il)? else {
+            return Ok(None);
+        };
         let data = at + il + sl;
         let end = if unknown { None } else { Some(data + size as usize) };
-        Ok(Some(Head { id: idv, start: at, data, end }))
+        Ok(Some(Head {
+            id: idv,
+            start: at,
+            data,
+            end,
+        }))
     }
 
     /// Children of a known-size master: (id, data).
@@ -468,7 +477,11 @@ fn parse_cluster(r: &R<'_>, h: &Head, seg_end: usize, offset: u64, out: &mut Dem
                 if out.clusters[index].first_block.is_none() {
                     out.clusters[index].first_block = Some((at - h.data) as u64);
                 }
-                let f = if c.id == 0xA3 { parse_block(d, true, ts)? } else { parse_group(r, d, ts)? };
+                let f = if c.id == 0xA3 {
+                    parse_block(d, true, ts)?
+                } else {
+                    parse_group(r, d, ts)?
+                };
                 frames.push(f);
             }
             _ => {}

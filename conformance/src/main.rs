@@ -28,7 +28,11 @@ pub struct Tools {
 pub fn run_ok(cmd: &mut Command, what: &str) -> Result<(), String> {
     let out = cmd.output().map_err(|e| format!("{what}: {e}"))?;
     if !out.status.success() {
-        return Err(format!("{what}: {}\n{}", out.status, String::from_utf8_lossy(&out.stderr)));
+        return Err(format!(
+            "{what}: {}\n{}",
+            out.status,
+            String::from_utf8_lossy(&out.stderr)
+        ));
     }
     Ok(())
 }
@@ -36,7 +40,11 @@ pub fn run_ok(cmd: &mut Command, what: &str) -> Result<(), String> {
 pub fn capture(cmd: &mut Command, what: &str) -> Result<String, String> {
     let out = cmd.output().map_err(|e| format!("{what}: {e}"))?;
     if !out.status.success() {
-        return Err(format!("{what}: {}\n{}", out.status, String::from_utf8_lossy(&out.stderr)));
+        return Err(format!(
+            "{what}: {}\n{}",
+            out.status,
+            String::from_utf8_lossy(&out.stderr)
+        ));
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
@@ -98,7 +106,11 @@ fn mux(case: Case, out_dir: &Path) -> Result<Written, String> {
     order.sort_by_key(|&(t, v, s, p)| (t, v, s, p));
     let order: Vec<(usize, usize)> = order.into_iter().map(|(_, _, s, p)| (s, p)).collect();
 
-    fn go<W: std::io::Write>(m: &mut Muxer<W>, case: &Case, order: &[(usize, usize)]) -> Result<Vec<(u64, u64, bool)>, String> {
+    fn go<W: std::io::Write>(
+        m: &mut Muxer<W>,
+        case: &Case,
+        order: &[(usize, usize)],
+    ) -> Result<Vec<(u64, u64, bool)>, String> {
         let mut ids = Vec::new();
         for s in &case.streams {
             let id = match &s.spec {
@@ -113,8 +125,14 @@ fn mux(case: Case, out_dir: &Path) -> Result<Written, String> {
             let s = &case.streams[si];
             let p = &s.packets[pi];
             let video = matches!(s.spec, Spec::Video(_));
-            let fo = s.extra.iter().find(|(i, _)| *i == pi).map(|(_, o)| *o).unwrap_or(FrameOptions::new(p.keyframe));
-            m.write_frame_with(ids[si], &p.data, p.ns, fo).map_err(|e| format!("{}: {e}", case.name))?;
+            let fo = s
+                .extra
+                .iter()
+                .find(|(i, _)| *i == pi)
+                .map(|(_, o)| *o)
+                .unwrap_or(FrameOptions::new(p.keyframe));
+            m.write_frame_with(ids[si], &p.data, p.ns, fo)
+                .map_err(|e| format!("{}: {e}", case.name))?;
             frames.push((ids[si].number(), 0, fo.keyframe || !video));
         }
         Ok(frames)
@@ -191,7 +209,12 @@ fn video(codec: VideoCodec, packets: Vec<Packet>, cp: Option<Vec<u8>>) -> Stream
         VideoCodec::Vp9 => "vp9",
         _ => "av1",
     };
-    Stream { codec: name, spec: Spec::Video(t), packets, extra: Vec::new() }
+    Stream {
+        codec: name,
+        spec: Spec::Video(t),
+        packets,
+        extra: Vec::new(),
+    }
 }
 
 fn cases(tools: &Tools, inp: &inputs::Inputs) -> Result<Vec<Case>, String> {
@@ -201,7 +224,16 @@ fn cases(tools: &Tools, inp: &inputs::Inputs) -> Result<Vec<Case>, String> {
     let seq = inputs::av1_prepare(&mut av1)?;
     let level: u8 = capture(
         Command::new(&tools.ffprobe)
-            .args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=level", "-of", "csv=p=0"])
+            .args([
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=level",
+                "-of",
+                "csv=p=0",
+            ])
             .arg(inp.dir.join("av1.ivf")),
         "ffprobe AV1 level",
     )?
@@ -221,7 +253,11 @@ fn cases(tools: &Tools, inp: &inputs::Inputs) -> Result<Vec<Case>, String> {
     };
     let vorbis_s = || Stream {
         codec: "vorbis",
-        spec: Spec::Audio(AudioTrack::vorbis(vorbis_headers[0].clone(), vorbis_headers[1].clone(), vorbis_headers[2].clone())),
+        spec: Spec::Audio(AudioTrack::vorbis(
+            vorbis_headers[0].clone(),
+            vorbis_headers[1].clone(),
+            vorbis_headers[2].clone(),
+        )),
         packets: vorbis.clone(),
         extra: Vec::new(),
     };
@@ -236,9 +272,18 @@ fn cases(tools: &Tools, inp: &inputs::Inputs) -> Result<Vec<Case>, String> {
             streams,
         };
         out.push(c("vp8_opus", vec![video(VideoCodec::Vp8, vp8.clone(), None), opus_s()]));
-        out.push(c("vp9_opus", vec![video(VideoCodec::Vp9, vp9.clone(), Some(vp9_cp.clone())), opus_s()]));
-        out.push(c("av1_opus", vec![video(VideoCodec::Av1, av1.clone(), Some(av1c.clone())), opus_s()]));
-        out.push(c("vp8_vorbis", vec![video(VideoCodec::Vp8, vp8.clone(), None), vorbis_s()]));
+        out.push(c(
+            "vp9_opus",
+            vec![video(VideoCodec::Vp9, vp9.clone(), Some(vp9_cp.clone())), opus_s()],
+        ));
+        out.push(c(
+            "av1_opus",
+            vec![video(VideoCodec::Av1, av1.clone(), Some(av1c.clone())), opus_s()],
+        ));
+        out.push(c(
+            "vp8_vorbis",
+            vec![video(VideoCodec::Vp8, vp8.clone(), None), vorbis_s()],
+        ));
         out.push(c("opus_only", vec![opus_s()]));
         out.push(c("vorbis_only", vec![vorbis_s()]));
     }
@@ -278,10 +323,14 @@ fn cases(tools: &Tools, inp: &inputs::Inputs) -> Result<Vec<Case>, String> {
     let mut opus_trimmed = opus_s();
     let last = opus_trimmed.packets.len() - 1;
     let pad_ns = (opus_trim.max(1) * 1_000_000_000 / 48_000) as i64;
-    opus_trimmed.extra.push((last, FrameOptions::new(true).with_discard_padding(pad_ns)));
+    opus_trimmed
+        .extra
+        .push((last, FrameOptions::new(true).with_discard_padding(pad_ns)));
     let mut vp8_dur = video(VideoCodec::Vp8, vp8.clone(), None);
     for (i, p) in vp8.iter().enumerate().skip(170) {
-        vp8_dur.extra.push((i, FrameOptions::new(p.keyframe).with_duration(33_333_333)));
+        vp8_dur
+            .extra
+            .push((i, FrameOptions::new(p.keyframe).with_duration(33_333_333)));
     }
     out.push(Case {
         name: "vp8_opus_groups.file".into(),
@@ -295,7 +344,9 @@ fn cases(tools: &Tools, inp: &inputs::Inputs) -> Result<Vec<Case>, String> {
         name: "vp8_opus_smallclusters.live".into(),
         live: true,
         scale: 1_000_000,
-        options: Options::new().with_max_cluster_duration(1_000_000_000).with_max_cluster_bytes(32 * 1024),
+        options: Options::new()
+            .with_max_cluster_duration(1_000_000_000)
+            .with_max_cluster_bytes(32 * 1024),
         streams: vec![video(VideoCodec::Vp8, vp8.clone(), None), opus_s()],
     });
     Ok(out)
@@ -317,7 +368,10 @@ impl Row {
 }
 
 fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
-    let mut row = Row { name: w.name.clone(), ..Default::default() };
+    let mut row = Row {
+        name: w.name.clone(),
+        ..Default::default()
+    };
 
     // 1. Our test demuxer: identical frames and timestamps.
     let parsed = demux::parse(&w.bytes);
@@ -326,13 +380,24 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
             let got: Vec<(u64, u64, bool)> = d.frames.iter().map(|f| (f.track, f.ticks, f.keyframe)).collect();
             row.check("round trip", got == w.frames, format!("{} frames", got.len()));
             if !w.live {
-                let cues_ok = d.cues.iter().all(|c| d.clusters.iter().any(|k| k.offset == c.cluster && k.timestamp == c.time && k.first_block == c.relative));
-                row.check("cues point at clusters", cues_ok && !d.cues.is_empty(), format!("{} cues", d.cues.len()));
+                let cues_ok = d.cues.iter().all(|c| {
+                    d.clusters
+                        .iter()
+                        .any(|k| k.offset == c.cluster && k.timestamp == c.time && k.first_block == c.relative)
+                });
+                row.check(
+                    "cues point at clusters",
+                    cues_ok && !d.cues.is_empty(),
+                    format!("{} cues", d.cues.len()),
+                );
             }
         }
         Err(e) => row.check("round trip", false, e.clone()),
     }
-    let cue_times: Vec<u64> = parsed.as_ref().map(|d| d.cues.iter().map(|c| c.time).collect()).unwrap_or_default();
+    let cue_times: Vec<u64> = parsed
+        .as_ref()
+        .map(|d| d.cues.iter().map(|c| c.time).collect())
+        .unwrap_or_default();
 
     // 2. mkvalidator.
     let mut cmd = Command::new(&tools.mkvalidator);
@@ -350,10 +415,25 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
     row.check("mkvalidator", ok && errs.is_empty(), note);
 
     // 3. ffprobe: streams and every packet's stream, time and key flag.
-    let (ok, out, err) = run(Command::new(&tools.ffprobe).args(["-v", "warning", "-show_entries", "stream=codec_name", "-of", "csv=p=0"]).arg(&w.path));
+    let (ok, out, err) = run(Command::new(&tools.ffprobe)
+        .args(["-v", "warning", "-show_entries", "stream=codec_name", "-of", "csv=p=0"])
+        .arg(&w.path));
     let names: Vec<&str> = out.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
-    row.check("ffprobe streams", ok && err.trim().is_empty() && names == w.codecs, format!("{names:?} {}", err.trim()));
-    let (ok, out, err) = run(Command::new(&tools.ffprobe).args(["-v", "warning", "-show_entries", "packet=stream_index,pts_time,flags", "-of", "csv=p=0"]).arg(&w.path));
+    row.check(
+        "ffprobe streams",
+        ok && err.trim().is_empty() && names == w.codecs,
+        format!("{names:?} {}", err.trim()),
+    );
+    let (ok, out, err) = run(Command::new(&tools.ffprobe)
+        .args([
+            "-v",
+            "warning",
+            "-show_entries",
+            "packet=stream_index,pts_time,flags",
+            "-of",
+            "csv=p=0",
+        ])
+        .arg(&w.path));
     let mut mismatch = None;
     let lines: Vec<&str> = out.lines().filter(|l| !l.trim().is_empty()).collect();
     for (i, (l, want)) in lines.iter().zip(&w.frames).enumerate() {
@@ -371,16 +451,31 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
     row.check(
         "ffprobe packets",
         ok && err.trim().is_empty() && count_ok && mismatch.is_none(),
-        format!("{}/{} {} {}", lines.len(), w.frames.len(), mismatch.unwrap_or_default(), err.trim()),
+        format!(
+            "{}/{} {} {}",
+            lines.len(),
+            w.frames.len(),
+            mismatch.unwrap_or_default(),
+            err.trim()
+        ),
     );
 
     // 4. ffmpeg decodes every stream without a message.
-    let (ok, _, err) = run(Command::new(&tools.ffmpeg).args(["-v", "error", "-i"]).arg(&w.path).args(["-map", "0", "-f", "null", "-"]));
-    row.check("ffmpeg decode", ok && err.trim().is_empty(), err.trim().lines().take(3).collect::<Vec<_>>().join(" | "));
+    let (ok, _, err) = run(Command::new(&tools.ffmpeg)
+        .args(["-v", "error", "-i"])
+        .arg(&w.path)
+        .args(["-map", "0", "-f", "null", "-"]));
+    row.check(
+        "ffmpeg decode",
+        ok && err.trim().is_empty(),
+        err.trim().lines().take(3).collect::<Vec<_>>().join(" | "),
+    );
 
     // 5. Seekable files: seek to every keyframe, and to mid-GOP points.
     if !w.live {
-        let (ok, out, _) = run(Command::new(&tools.ffprobe).args(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0"]).arg(&w.path));
+        let (ok, out, _) = run(Command::new(&tools.ffprobe)
+            .args(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0"])
+            .arg(&w.path));
         let dur: f64 = out.trim().parse().unwrap_or(0.0);
         row.check("duration", ok && dur > 5.5 && dur < 6.5, format!("{dur:.3} s"));
         let sel = if w.has_video { "v:0" } else { "a:0" };
@@ -389,7 +484,11 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
         let keys = cue_times.clone();
         if w.has_video {
             let vk: Vec<u64> = w.frames.iter().filter(|f| f.0 == 1 && f.2).map(|f| f.1).collect();
-            row.check("one cue per video keyframe", vk == keys, format!("{} keyframes", vk.len()));
+            row.check(
+                "one cue per video keyframe",
+                vk == keys,
+                format!("{} keyframes", vk.len()),
+            );
         }
         let mut good = 0;
         let mut bad = Vec::new();
@@ -397,14 +496,29 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
             let t = k as f64 * w.scale as f64 / 1e9;
             for target in [t, t + 0.2] {
                 let (ok, out, _) = run(Command::new(&tools.ffprobe)
-                    .args(["-v", "error", "-select_streams", sel, "-read_intervals", &format!("{target:.4}%+#1"), "-show_entries", "packet=pts_time,flags", "-of", "csv=p=0"])
+                    .args([
+                        "-v",
+                        "error",
+                        "-select_streams",
+                        sel,
+                        "-read_intervals",
+                        &format!("{target:.4}%+#1"),
+                        "-show_entries",
+                        "packet=pts_time,flags",
+                        "-of",
+                        "csv=p=0",
+                    ])
                     .arg(&w.path));
                 let first = out.lines().find(|l| !l.trim().is_empty()).unwrap_or("");
                 let pts: f64 = first.split(',').next().and_then(|s| s.parse().ok()).unwrap_or(-1.0);
                 let want_key = !w.has_video || first.contains('K');
                 // Video: exactly the keyframe. Audio-only: a packet from
                 // the cue point up to the target.
-                let hit = if w.has_video { (pts - t).abs() < 0.0015 } else { pts > t - 0.0015 && pts <= target + 0.0015 };
+                let hit = if w.has_video {
+                    (pts - t).abs() < 0.0015
+                } else {
+                    pts > t - 0.0015 && pts <= target + 0.0015
+                };
                 if ok && hit && want_key {
                     good += 1;
                 } else if bad.len() < 3 {
@@ -412,7 +526,11 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
                 }
             }
         }
-        row.check("seek to keyframes", good == keys.len() * 2 && !keys.is_empty(), format!("{good}/{} {}", keys.len() * 2, bad.join(" ")));
+        row.check(
+            "seek to keyframes",
+            good == keys.len() * 2 && !keys.is_empty(),
+            format!("{good}/{} {}", keys.len() * 2, bad.join(" ")),
+        );
     }
 
     // 6. Live streams cut at random offsets still decode every frame of
@@ -428,7 +546,11 @@ fn row_cuts(tools: &Tools, w: &Written, work: &Path, row: &mut Row) {
         Ok(d) => d,
         Err(e) => return row.check("cut-off", false, e),
     };
-    let starts: Vec<usize> = full.clusters.iter().map(|c| (full.segment_data_at + c.offset) as usize).collect();
+    let starts: Vec<usize> = full
+        .clusters
+        .iter()
+        .map(|c| (full.segment_data_at + c.offset) as usize)
+        .collect();
     let mut ends: Vec<usize> = starts.iter().skip(1).copied().collect();
     ends.push(w.bytes.len());
     let mut seed = 0x1234_5678_9ABC_DEF1u64 ^ w.bytes.len() as u64;
@@ -455,8 +577,21 @@ fn row_cuts(tools: &Tools, w: &Written, work: &Path, row: &mut Row) {
             notes.push("write failed".to_string());
             continue;
         }
-        let (_, out, _) = run(Command::new(&tools.ffprobe).args(["-v", "quiet", "-count_frames", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0"]).arg(&p));
-        let got: Vec<usize> = out.lines().filter_map(|l| l.trim().trim_end_matches(',').parse().ok()).collect();
+        let (_, out, _) = run(Command::new(&tools.ffprobe)
+            .args([
+                "-v",
+                "quiet",
+                "-count_frames",
+                "-show_entries",
+                "stream=nb_read_frames",
+                "-of",
+                "csv=p=0",
+            ])
+            .arg(&p));
+        let got: Vec<usize> = out
+            .lines()
+            .filter_map(|l| l.trim().trim_end_matches(',').parse().ok())
+            .collect();
         let ok = got.len() == ntracks && got.iter().zip(&need).all(|(g, n)| g >= n);
         if ok {
             good += 1;
@@ -465,7 +600,11 @@ fn row_cuts(tools: &Tools, w: &Written, work: &Path, row: &mut Row) {
         }
         let _ = std::fs::remove_file(&p);
     }
-    row.check("cut-off plays to last whole cluster", good == cuts.len(), format!("{good}/{} {}", cuts.len(), notes.join(" ")));
+    row.check(
+        "cut-off plays to last whole cluster",
+        good == cuts.len(),
+        format!("{good}/{} {}", cuts.len(), notes.join(" ")),
+    );
 }
 
 fn main() {
@@ -499,7 +638,10 @@ fn main() {
     for case in cases {
         match mux(case, &media) {
             Ok(w) => rows.push(verify(&tools, &w, &work, mkv_live_flag)),
-            Err(e) => rows.push(Row { name: "mux".into(), checks: vec![("mux".into(), false, e)] }),
+            Err(e) => rows.push(Row {
+                name: "mux".into(),
+                checks: vec![("mux".into(), false, e)],
+            }),
         }
     }
     let mut report = String::new();

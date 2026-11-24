@@ -14,7 +14,8 @@ fn write_all<W: std::io::Write>(m: &mut Muxer<W>, input: &[In]) {
     let v = webm_muxer_track(m, 1);
     let a = webm_muxer_track(m, 2);
     for f in input {
-        m.write_frame(if f.track == 1 { v } else { a }, &f.data, f.ns, f.keyframe).unwrap();
+        m.write_frame(if f.track == 1 { v } else { a }, &f.data, f.ns, f.keyframe)
+            .unwrap();
     }
 }
 
@@ -28,7 +29,11 @@ fn webm_muxer_track<W: std::io::Write>(m: &mut Muxer<W>, n: u64) -> webm_muxer::
 
 /// The end offset (in the whole buffer) of each cluster in a full parse.
 fn cluster_ends(full: &Demuxed, total: usize) -> Vec<usize> {
-    let starts: Vec<usize> = full.clusters.iter().map(|c| (full.segment_data_at + c.offset) as usize).collect();
+    let starts: Vec<usize> = full
+        .clusters
+        .iter()
+        .map(|c| (full.segment_data_at + c.offset) as usize)
+        .collect();
     let mut ends: Vec<usize> = starts.iter().skip(1).copied().collect();
     // The last cluster ends at the next top-level element, or the end.
     let last = *starts.last().unwrap();
@@ -59,12 +64,19 @@ fn check_cuts(bytes: &[u8], input: &[In], cuts: usize, seed: u64) {
         assert!(d.frames.len() <= full.frames.len());
         for (i, f) in d.frames.iter().enumerate() {
             assert_eq!(f.data, full.frames[i].data, "cut at {cut}: frame {i}");
-            assert_eq!((f.track, f.ticks, f.keyframe), (full.frames[i].track, full.frames[i].ticks, full.frames[i].keyframe));
+            assert_eq!(
+                (f.track, f.ticks, f.keyframe),
+                (full.frames[i].track, full.frames[i].ticks, full.frames[i].keyframe)
+            );
         }
         // Every frame of every cluster wholly inside the cut is there.
         let whole = ends.iter().filter(|&&e| e <= cut).count();
         let expected = full.frames.iter().filter(|f| f.cluster < whole).count();
-        assert!(d.frames.len() >= expected, "cut at {cut}: {} frames, {expected} expected", d.frames.len());
+        assert!(
+            d.frames.len() >= expected,
+            "cut at {cut}: {} frames, {expected} expected",
+            d.frames.len()
+        );
         if !d.frames.is_empty() {
             assert!(!d.tracks.is_empty());
         }

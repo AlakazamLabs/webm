@@ -7,9 +7,7 @@ use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use support::demux::{self, Demuxed, CLUSTER, CUES, INFO, TRACKS};
 use support::{av_schedule, vp8_frames, In, OPUS_SILENCE};
-use webm_muxer::{
-    opus_head, vp9_codec_private, AudioTrack, FrameOptions, Muxer, Options, VideoCodec, VideoTrack,
-};
+use webm_muxer::{opus_head, vp9_codec_private, AudioTrack, FrameOptions, Muxer, Options, VideoCodec, VideoTrack};
 
 fn tracks<W: Write>(m: &mut Muxer<W>) -> [webm_muxer::TrackId; 2] {
     let v = m.add_video_track(VideoTrack::new(VideoCodec::Vp8, 64, 48)).unwrap();
@@ -23,14 +21,16 @@ fn mux_av(input: &[In], seekable: bool, options: Options) -> Vec<u8> {
         let mut m = Muxer::new_seekable(Cursor::new(Vec::new()), options).unwrap();
         let ids = tracks(&mut m);
         for f in input {
-            m.write_frame(ids[f.track as usize - 1], &f.data, f.ns, f.keyframe).unwrap();
+            m.write_frame(ids[f.track as usize - 1], &f.data, f.ns, f.keyframe)
+                .unwrap();
         }
         m.finish().unwrap().into_inner()
     } else {
         let mut m = Muxer::new(Vec::new(), options).unwrap();
         let ids = tracks(&mut m);
         for f in input {
-            m.write_frame(ids[f.track as usize - 1], &f.data, f.ns, f.keyframe).unwrap();
+            m.write_frame(ids[f.track as usize - 1], &f.data, f.ns, f.keyframe)
+                .unwrap();
         }
         m.finish().unwrap()
     }
@@ -78,7 +78,11 @@ fn assert_cues_point_at_clusters(d: &Demuxed) {
 }
 
 fn seek_entry(d: &Demuxed, id: u32) -> u64 {
-    d.seek_head.iter().find(|(i, _)| *i == id).unwrap_or_else(|| panic!("no SeekHead entry for {id:#x}")).1
+    d.seek_head
+        .iter()
+        .find(|(i, _)| *i == id)
+        .unwrap_or_else(|| panic!("no SeekHead entry for {id:#x}"))
+        .1
 }
 
 #[test]
@@ -119,7 +123,10 @@ fn seekable_vp8_opus_round_trips() {
     // Tracks.
     let v = &d.tracks[0];
     assert_eq!((v.number, v.kind, v.codec_id.as_str()), (1, 1, "V_VP8"));
-    assert_eq!((v.width, v.height, v.codec_private.as_ref()), (Some(64), Some(48), None));
+    assert_eq!(
+        (v.width, v.height, v.codec_private.as_ref()),
+        (Some(64), Some(48), None)
+    );
     assert_eq!(v.lacing, Some(0));
     let a = &d.tracks[1];
     assert_eq!((a.number, a.kind, a.codec_id.as_str()), (2, 2, "A_OPUS"));
@@ -190,7 +197,13 @@ fn a_finer_timestamp_scale_keeps_finer_timestamps() {
     assert_eq!(d.timestamp_scale, 1000);
     assert_same_frames(&d, &input, 1000);
     for (i, c) in d.clusters.iter().enumerate() {
-        let span = d.frames.iter().filter(|f| f.cluster == i).map(|f| f.ticks - c.timestamp).max().unwrap();
+        let span = d
+            .frames
+            .iter()
+            .filter(|f| f.cluster == i)
+            .map(|f| f.ticks - c.timestamp)
+            .max()
+            .unwrap();
         assert!(span <= 32_767);
     }
     assert!(d.clusters.len() > 20, "{} clusters", d.clusters.len());
@@ -206,7 +219,11 @@ fn cluster_caps_split_long_and_large_clusters() {
     }
     let d = demux::parse(&m.finish().unwrap()).unwrap();
     assert_eq!(d.clusters.len(), 10);
-    assert!(d.clusters.iter().enumerate().all(|(i, c)| c.timestamp == i as u64 * 1000));
+    assert!(d
+        .clusters
+        .iter()
+        .enumerate()
+        .all(|(i, c)| c.timestamp == i as u64 * 1000));
 
     // The size cap: 10 KiB clusters of 1 KiB frames.
     let mut m = Muxer::new(Vec::new(), Options::new().with_max_cluster_bytes(10 * 1024)).unwrap();
@@ -215,7 +232,11 @@ fn cluster_caps_split_long_and_large_clusters() {
         m.write_frame(a, &[7u8; 1024], i * 20_000_000, true).unwrap();
     }
     let d = demux::parse(&m.finish().unwrap()).unwrap();
-    assert!(d.clusters.len() >= 10 && d.clusters.len() <= 12, "{} clusters", d.clusters.len());
+    assert!(
+        d.clusters.len() >= 10 && d.clusters.len() <= 12,
+        "{} clusters",
+        d.clusters.len()
+    );
     // A frame larger than the cap gets a cluster of its own.
     let mut m = Muxer::new(Vec::new(), Options::new().with_max_cluster_bytes(100)).unwrap();
     let a = m.add_audio_track(AudioTrack::opus(2, 0)).unwrap();
@@ -229,7 +250,11 @@ fn cluster_caps_split_long_and_large_clusters() {
 
 #[test]
 fn audio_only_files_cue_each_cluster() {
-    let mut m = Muxer::new_seekable(Cursor::new(Vec::new()), Options::new().with_max_cluster_duration(2_000_000_000)).unwrap();
+    let mut m = Muxer::new_seekable(
+        Cursor::new(Vec::new()),
+        Options::new().with_max_cluster_duration(2_000_000_000),
+    )
+    .unwrap();
     let a = m.add_audio_track(AudioTrack::opus(2, 312)).unwrap();
     for i in 0..300u64 {
         m.write_frame(a, &OPUS_SILENCE, i * 20_000_000, true).unwrap();
@@ -257,18 +282,36 @@ fn several_tracks_of_every_codec() {
     };
     let av1c = [0x81, 0x00, 0x0C, 0x00, 0x0A, 0x0B, 0x00, 0x00, 0x00];
     let mut m = Muxer::new_seekable(Cursor::new(Vec::new()), Options::new().with_title("Test")).unwrap();
-    let vp8 = m.add_video_track(VideoTrack::new(VideoCodec::Vp8, 64, 48).with_name("main")).unwrap();
-    let vp9 = m
-        .add_video_track(VideoTrack::new(VideoCodec::Vp9, 32, 24).with_codec_private(vp9_codec_private(Some(0), Some(10), Some(8), Some(1))))
+    let vp8 = m
+        .add_video_track(VideoTrack::new(VideoCodec::Vp8, 64, 48).with_name("main"))
         .unwrap();
-    let av1 = m.add_video_track(VideoTrack::new(VideoCodec::Av1, 16, 16).with_codec_private(av1c.to_vec()).with_display_size(32, 16)).unwrap();
+    let vp9 = m
+        .add_video_track(
+            VideoTrack::new(VideoCodec::Vp9, 32, 24).with_codec_private(vp9_codec_private(
+                Some(0),
+                Some(10),
+                Some(8),
+                Some(1),
+            )),
+        )
+        .unwrap();
+    let av1 = m
+        .add_video_track(
+            VideoTrack::new(VideoCodec::Av1, 16, 16)
+                .with_codec_private(av1c.to_vec())
+                .with_display_size(32, 16),
+        )
+        .unwrap();
     let opus = m.add_audio_track(AudioTrack::opus(2, 0).with_language("fra")).unwrap();
-    let vorbis = m.add_audio_track(AudioTrack::vorbis(vorbis_id.clone(), vec![3u8; 7], vec![5u8; 300]).with_bit_depth(16)).unwrap();
+    let vorbis = m
+        .add_audio_track(AudioTrack::vorbis(vorbis_id.clone(), vec![3u8; 7], vec![5u8; 300]).with_bit_depth(16))
+        .unwrap();
     let video = vp8_frames(64, 48, 10, 5);
     for (i, (f, k)) in video.iter().enumerate() {
         let ns = i as u64 * 100_000_000;
         m.write_frame(vp8, f, ns, *k).unwrap();
-        m.write_frame(vp9, &[0x82, 0x49, 0x83, i as u8], ns, i % 5 == 0).unwrap();
+        m.write_frame(vp9, &[0x82, 0x49, 0x83, i as u8], ns, i % 5 == 0)
+            .unwrap();
         m.write_frame(av1, &[0x12, 0x00, i as u8], ns, i % 5 == 0).unwrap();
         m.write_frame(opus, &OPUS_SILENCE, ns, true).unwrap();
         m.write_frame(vorbis, &[i as u8 + 1; 9], ns, true).unwrap();
@@ -277,13 +320,19 @@ fn several_tracks_of_every_codec() {
     assert_eq!(d.title.as_deref(), Some("Test"));
     let ids: Vec<_> = d.tracks.iter().map(|t| t.codec_id.as_str()).collect();
     assert_eq!(ids, ["V_VP8", "V_VP9", "V_AV1", "A_OPUS", "A_VORBIS"]);
-    assert_eq!(d.tracks[1].codec_private.as_deref(), Some(&[1, 1, 0, 2, 1, 10, 3, 1, 8, 4, 1, 1][..]));
+    assert_eq!(
+        d.tracks[1].codec_private.as_deref(),
+        Some(&[1, 1, 0, 2, 1, 10, 3, 1, 8, 4, 1, 1][..])
+    );
     assert_eq!(d.tracks[2].codec_private.as_deref(), Some(&av1c[..]));
     let vorbis_cp = d.tracks[4].codec_private.as_ref().unwrap();
     assert_eq!(&vorbis_cp[..3], &[2, vorbis_id.len() as u8, 7]);
     assert_eq!(&vorbis_cp[3..3 + vorbis_id.len()], &vorbis_id[..]);
     assert_eq!(vorbis_cp.len(), 3 + vorbis_id.len() + 7 + 300);
-    assert_eq!((d.tracks[4].rate, d.tracks[4].channels, d.tracks[4].codec_delay), (Some(44_100.0), Some(2), None));
+    assert_eq!(
+        (d.tracks[4].rate, d.tracks[4].channels, d.tracks[4].codec_delay),
+        (Some(44_100.0), Some(2), None)
+    );
     assert_eq!(d.frames.len(), 50);
     // Clusters follow the first video track's keyframes only.
     assert_eq!(d.clusters.len(), 2);
@@ -298,10 +347,28 @@ fn durations_and_discard_padding_use_block_groups() {
     let v = m.add_video_track(VideoTrack::new(VideoCodec::Vp8, 64, 48)).unwrap();
     let a = m.add_audio_track(AudioTrack::opus(2, 312)).unwrap();
     m.write_frame(v, &video[0].0, 0, true).unwrap();
-    m.write_frame_with(v, &video[1].0, 40_000_000, FrameOptions::new(false).with_duration(40_000_000)).unwrap();
+    m.write_frame_with(
+        v,
+        &video[1].0,
+        40_000_000,
+        FrameOptions::new(false).with_duration(40_000_000),
+    )
+    .unwrap();
     m.write_frame(v, &video[2].0, 80_000_000, false).unwrap();
-    m.write_frame_with(a, &OPUS_SILENCE, 80_000_000, FrameOptions::new(true).with_discard_padding(6_500_000)).unwrap();
-    m.write_frame_with(v, &video[3].0, 120_000_000, FrameOptions::new(true).with_duration(50_000_000)).unwrap();
+    m.write_frame_with(
+        a,
+        &OPUS_SILENCE,
+        80_000_000,
+        FrameOptions::new(true).with_discard_padding(6_500_000),
+    )
+    .unwrap();
+    m.write_frame_with(
+        v,
+        &video[3].0,
+        120_000_000,
+        FrameOptions::new(true).with_duration(50_000_000),
+    )
+    .unwrap();
     let d = demux::parse(&m.finish().unwrap().into_inner()).unwrap();
     let f = &d.frames;
     assert_eq!(f.len(), 5);
@@ -325,7 +392,8 @@ fn a_seekable_file_may_start_mid_writer() {
     let v = m.add_video_track(VideoTrack::new(VideoCodec::Vp8, 64, 48)).unwrap();
     let a = m.add_audio_track(AudioTrack::opus(1, 312)).unwrap();
     for f in &input {
-        m.write_frame(if f.track == 1 { v } else { a }, &f.data, f.ns, f.keyframe).unwrap();
+        m.write_frame(if f.track == 1 { v } else { a }, &f.data, f.ns, f.keyframe)
+            .unwrap();
     }
     let mut cur = m.finish().unwrap();
     assert_eq!(cur.stream_position().unwrap(), cur.get_ref().len() as u64);
@@ -351,5 +419,8 @@ fn tracks_without_frames_make_a_valid_file() {
 fn output_is_reproducible() {
     let video = vp8_frames(64, 48, 30, 10);
     let input = av_schedule(&video, 50);
-    assert_eq!(mux_av(&input, true, Options::new()), mux_av(&input, true, Options::new()));
+    assert_eq!(
+        mux_av(&input, true, Options::new()),
+        mux_av(&input, true, Options::new())
+    );
 }

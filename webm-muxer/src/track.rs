@@ -200,11 +200,7 @@ impl AudioTrack {
     /// A Vorbis track from its three header packets (identification,
     /// comment and setup). The channel count and sample rate are read
     /// from the identification header.
-    pub fn vorbis(
-        identification: impl Into<Vec<u8>>,
-        comment: impl Into<Vec<u8>>,
-        setup: impl Into<Vec<u8>>,
-    ) -> Self {
+    pub fn vorbis(identification: impl Into<Vec<u8>>, comment: impl Into<Vec<u8>>, setup: impl Into<Vec<u8>>) -> Self {
         AudioTrack {
             codec: AudioCodec::Vorbis,
             source: AudioSource::Vorbis(identification.into(), comment.into(), setup.into()),

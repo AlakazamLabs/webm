@@ -21,30 +21,103 @@ pub struct Inputs {
 /// Makes every input file in `dir` with ffmpeg.
 pub fn make(tools: &Tools, dir: &Path) -> Result<Inputs, String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let src = ["-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30", "-t", "6", "-pix_fmt", "yuv420p"];
+    let src = [
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=320x240:rate=30",
+        "-t",
+        "6",
+        "-pix_fmt",
+        "yuv420p",
+    ];
     let tone = |f: &str| format!("sine=frequency={f}:sample_rate=48000:duration=6");
     let jobs: Vec<(String, Vec<String>)> = vec![
         (
             "vp9.ivf".into(),
             strs(&src)
                 .into_iter()
-                .chain(strs(&["-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-g", "30", "-keyint_min", "30", "-lag-in-frames", "0", "-b:v", "500k", "-f", "ivf"]))
+                .chain(strs(&[
+                    "-c:v",
+                    "libvpx-vp9",
+                    "-deadline",
+                    "realtime",
+                    "-cpu-used",
+                    "8",
+                    "-g",
+                    "30",
+                    "-keyint_min",
+                    "30",
+                    "-lag-in-frames",
+                    "0",
+                    "-b:v",
+                    "500k",
+                    "-f",
+                    "ivf",
+                ]))
                 .collect(),
         ),
         (
             "av1.ivf".into(),
             strs(&src)
                 .into_iter()
-                .chain(strs(&["-c:v", "libaom-av1", "-cpu-used", "8", "-usage", "realtime", "-row-mt", "1", "-g", "30", "-keyint_min", "30", "-b:v", "500k", "-f", "ivf"]))
+                .chain(strs(&[
+                    "-c:v",
+                    "libaom-av1",
+                    "-cpu-used",
+                    "8",
+                    "-usage",
+                    "realtime",
+                    "-row-mt",
+                    "1",
+                    "-g",
+                    "30",
+                    "-keyint_min",
+                    "30",
+                    "-b:v",
+                    "500k",
+                    "-f",
+                    "ivf",
+                ]))
                 .collect(),
         ),
         (
             "opus.ogg".into(),
-            strs(&["-f", "lavfi", "-i", &tone("440"), "-ac", "2", "-c:a", "libopus", "-b:a", "64k", "-frame_duration", "20", "-f", "ogg"]),
+            strs(&[
+                "-f",
+                "lavfi",
+                "-i",
+                &tone("440"),
+                "-ac",
+                "2",
+                "-c:a",
+                "libopus",
+                "-b:a",
+                "64k",
+                "-frame_duration",
+                "20",
+                "-f",
+                "ogg",
+            ]),
         ),
         (
             "vorbis.ogg".into(),
-            strs(&["-f", "lavfi", "-i", &tone("660"), "-ac", "2", "-ar", "44100", "-c:a", "libvorbis", "-q:a", "3", "-f", "ogg"]),
+            strs(&[
+                "-f",
+                "lavfi",
+                "-i",
+                &tone("660"),
+                "-ac",
+                "2",
+                "-ar",
+                "44100",
+                "-c:a",
+                "libvorbis",
+                "-q:a",
+                "3",
+                "-f",
+                "ogg",
+            ]),
         ),
     ];
     for (name, mut args) in jobs {
@@ -96,12 +169,18 @@ impl Inputs {
         }
         // Keyframe flags from ffprobe, in packet order.
         let out = crate::capture(
-            Command::new(&tools.ffprobe).args(["-v", "error", "-show_entries", "packet=flags", "-of", "csv=p=0"]).arg(&path),
+            Command::new(&tools.ffprobe)
+                .args(["-v", "error", "-show_entries", "packet=flags", "-of", "csv=p=0"])
+                .arg(&path),
             "ffprobe on an IVF input",
         )?;
         let flags: Vec<bool> = out.lines().filter(|l| !l.is_empty()).map(|l| l.contains('K')).collect();
         if flags.len() != frames.len() {
-            return Err(format!("{name}: ffprobe saw {} packets, the reader {}", flags.len(), frames.len()));
+            return Err(format!(
+                "{name}: ffprobe saw {} packets, the reader {}",
+                flags.len(),
+                frames.len()
+            ));
         }
         for (f, k) in frames.iter_mut().zip(flags) {
             f.keyframe = k;
@@ -195,7 +274,11 @@ pub fn vorbis(path: &Path) -> Result<([Vec<u8>; 3], Vec<Packet>, u32), String> {
                     }
                 }
                 last_ns = Some(ns);
-                packets.push(Packet { data: p, ns, keyframe: true });
+                packets.push(Packet {
+                    data: p,
+                    ns,
+                    keyframe: true,
+                });
             }
             prev_granule = *g;
         }
