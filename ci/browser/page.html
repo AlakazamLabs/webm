@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>webm playback check</title>
+<video id="v" muted playsinline preload="auto"></video>
+<script>
+  // Plays ?f=<file> to the end (at 4x), optionally seeking to ?seek=<s>
+  // first, and leaves the outcome in window.result.
+  const q = new URLSearchParams(location.search);
+  const v = document.getElementById('v');
+  const r = { events: [] };
+  const done = (why) => {
+    if (r.done) return;
+    r.done = why;
+    r.currentTime = v.currentTime;
+    r.duration = v.duration;
+    r.videoWidth = v.videoWidth;
+    r.videoHeight = v.videoHeight;
+    const pq = v.getVideoPlaybackQuality ? v.getVideoPlaybackQuality() : null;
+    r.frames = pq ? pq.totalVideoFrames : null;
+    r.dropped = pq ? pq.droppedVideoFrames : null;
+    window.result = r;
+  };
+  v.addEventListener('error', () => {
+    r.error = v.error ? { code: v.error.code, message: v.error.message } : 'unknown';
+    done('error');
+  });
+  v.addEventListener('ended', () => done('ended'));
+  v.addEventListener('loadedmetadata', async () => {
+    r.events.push('loadedmetadata');
+    r.metaDuration = v.duration;
+    const seek = q.get('seek');
+    if (seek !== null) {
+      await new Promise((res) => {
+        v.addEventListener('seeked', res, { once: true });
+        v.currentTime = Number(seek);
+      });
+      r.seekedTo = v.currentTime;
+    }
+    v.playbackRate = 4;
+    try { await v.play(); } catch (e) { r.playError = String(e); done('play-rejected'); }
+  });
+  v.src = q.get('f');
+</script>

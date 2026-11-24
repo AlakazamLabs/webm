@@ -428,24 +428,15 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
     }
     let (ok, out, err, code) = run_code(cmd.arg(&w.path));
     let text = format!("{out}{err}");
-    // The same check on an ffmpeg remux of the file, for comparison.
-    let remux = work.join(format!("{}.remux.webm", w.name));
-    let _ = run(Command::new(&tools.ffmpeg).args(["-y", "-v", "error", "-i"]).arg(&w.path).args(["-map", "0", "-c", "copy", "-f", "webm"]).arg(&remux));
-    let mut rcmd = Command::new(&tools.mkvalidator);
-    if w.live && mkv_live_flag {
-        rcmd.arg("--live");
-    }
-    let (_, rout, rerr, rcode) = run_code(rcmd.arg(&remux));
-    let _ = std::fs::write(work.join(format!("{}.remux.mkvalidator.txt", w.name)), format!("exit {rcode}\n{rout}{rerr}"));
-    let _ = std::fs::remove_file(&remux);
     let _ = std::fs::write(work.join(format!("{}.mkvalidator.txt", w.name)), format!("exit {code}\n{text}"));
     let errs: Vec<&str> = text.lines().map(str::trim).filter(|l| l.starts_with("ERR")).collect();
     let wrns: Vec<&str> = text.lines().map(str::trim).filter(|l| l.starts_with("WRN")).collect();
-    let mut note = format!("exit {code} (remux: exit {rcode}), {} ERR, {} WRN", errs.len(), wrns.len());
+    let mut note = format!("exit {code}, {} ERR, {} WRN", errs.len(), wrns.len());
     for l in errs.iter().chain(&wrns).take(6) {
         let _ = write!(note, " | {l}");
     }
-    row.check("mkvalidator", ok && errs.is_empty(), note);
+    let valid = text.contains("the file appears to be valid");
+    row.check("mkvalidator", ok && valid && errs.is_empty() && wrns.is_empty(), note);
 
     // 3. ffprobe: streams and every packet's stream, time and key flag.
     let (ok, out, err) = run(Command::new(&tools.ffprobe)
