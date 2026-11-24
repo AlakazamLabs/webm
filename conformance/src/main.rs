@@ -49,6 +49,19 @@ pub fn capture(cmd: &mut Command, what: &str) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+/// Output of a command and its exit code (-1 if none).
+fn run_code(cmd: &mut Command) -> (bool, String, String, i32) {
+    match cmd.output() {
+        Ok(o) => (
+            o.status.success(),
+            String::from_utf8_lossy(&o.stdout).into_owned(),
+            String::from_utf8_lossy(&o.stderr).into_owned(),
+            o.status.code().unwrap_or(-1),
+        ),
+        Err(e) => (false, String::new(), e.to_string(), -1),
+    }
+}
+
 /// Output of a command: (success, stdout, stderr).
 fn run(cmd: &mut Command) -> (bool, String, String) {
     match cmd.output() {
@@ -413,12 +426,22 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
     if w.live && mkv_live_flag {
         cmd.arg("--live");
     }
-    let (ok, out, err) = run(cmd.arg(&w.path));
+    let (ok, out, err, code) = run_code(cmd.arg(&w.path));
     let text = format!("{out}{err}");
-    let _ = std::fs::write(work.join(format!("{}.mkvalidator.txt", w.name)), &text);
+    // The same check on an ffmpeg remux of the file, for comparison.
+    let remux = work.join(format!("{}.remux.webm", w.name));
+    let _ = run(Command::new(&tools.ffmpeg).args(["-y", "-v", "error", "-i"]).arg(&w.path).args(["-map", "0", "-c", "copy", "-f", "webm"]).arg(&remux));
+    let mut rcmd = Command::new(&tools.mkvalidator);
+    if w.live && mkv_live_flag {
+        rcmd.arg("--live");
+    }
+    let (_, rout, rerr, rcode) = run_code(rcmd.arg(&remux));
+    let _ = std::fs::write(work.join(format!("{}.remux.mkvalidator.txt", w.name)), format!("exit {rcode}\n{rout}{rerr}"));
+    let _ = std::fs::remove_file(&remux);
+    let _ = std::fs::write(work.join(format!("{}.mkvalidator.txt", w.name)), format!("exit {code}\n{text}"));
     let errs: Vec<&str> = text.lines().map(str::trim).filter(|l| l.starts_with("ERR")).collect();
     let wrns: Vec<&str> = text.lines().map(str::trim).filter(|l| l.starts_with("WRN")).collect();
-    let mut note = format!("{} ERR, {} WRN", errs.len(), wrns.len());
+    let mut note = format!("exit {code} (remux: exit {rcode}), {} ERR, {} WRN", errs.len(), wrns.len());
     for l in errs.iter().chain(&wrns).take(6) {
         let _ = write!(note, " | {l}");
     }
@@ -451,9 +474,11 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
         let si: u64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(u64::MAX);
         let pts: f64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(-1.0);
         let key = parts.next().is_some_and(|f| f.contains('K'));
+        // ffprobe subtracts CodecDelay, rounded to its time base.
         let delay = w.delays_ns.get(si as usize).copied().unwrap_or(0);
-        let ticks = ((pts * 1e9 + delay as f64) / w.scale as f64).round() as u64;
-        if si + 1 != want.0 || ticks != want.1 || key != want.2 {
+        let want_ns = (want.1 * w.scale) as f64;
+        let close = (pts * 1e9 + delay as f64 - want_ns).abs() <= w.scale as f64 * 1.001;
+        if si + 1 != want.0 || !close || key != want.2 {
             mismatch = Some(format!("packet {i}: got {l}, want {want:?}"));
             break;
         }
@@ -521,7 +546,10 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
                     ])
                     .arg(&w.path));
                 let first = out.lines().find(|l| !l.trim().is_empty()).unwrap_or("");
-                let pts: f64 = first.split(',').next().and_then(|s| s.parse().ok()).unwrap_or(-1.0);
+                let mut pts: f64 = first.split(',').next().and_then(|s| s.parse().ok()).unwrap_or(-1.0);
+                if !w.has_video {
+                    pts += w.delays_ns[0] as f64 / 1e9;
+                }
                 let want_key = !w.has_video || first.contains('K');
                 // Video: exactly the keyframe. Audio-only: a packet from
                 // the cue point up to the target.
