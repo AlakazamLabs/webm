@@ -11,13 +11,14 @@ use webm_muxer::{
     opus_head, vp9_codec_private, AudioTrack, FrameOptions, Muxer, Options, VideoCodec, VideoTrack,
 };
 
+fn tracks<W: Write>(m: &mut Muxer<W>) -> [webm_muxer::TrackId; 2] {
+    let v = m.add_video_track(VideoTrack::new(VideoCodec::Vp8, 64, 48)).unwrap();
+    let a = m.add_audio_track(AudioTrack::opus(1, 312)).unwrap();
+    assert_eq!((v.number(), a.number()), (1, 2));
+    [v, a]
+}
+
 fn mux_av(input: &[In], seekable: bool, options: Options) -> Vec<u8> {
-    let tracks = |m: &mut Muxer<_>| {
-        let v = m.add_video_track(VideoTrack::new(VideoCodec::Vp8, 64, 48)).unwrap();
-        let a = m.add_audio_track(AudioTrack::opus(1, 312)).unwrap();
-        assert_eq!((v.number(), a.number()), (1, 2));
-        [v, a]
-    };
     if seekable {
         let mut m = Muxer::new_seekable(Cursor::new(Vec::new()), options).unwrap();
         let ids = tracks(&mut m);
