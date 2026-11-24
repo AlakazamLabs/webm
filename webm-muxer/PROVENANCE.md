@@ -43,7 +43,7 @@ Used only as separate processes, to check the output:
   timestamps, keyframe flags, seeking to each keyframe, and decoding of
   whole and cut-off files. `ffmpeg` also encoded test inputs (VP9, AV1,
   Opus and Vorbis) into IVF and Ogg files, which the test tool reads;
-- Chromium and Firefox (headless, through Playwright): playback to the
-  `ended` event and seeking.
+- Chromium 131 and Firefox 132 (headless, through Playwright 1.49.1):
+  playback to the `ended` event and seeking.
 
 The VP8 test frames come from Alakazam Labs' own `vp8-encoder` crate.
