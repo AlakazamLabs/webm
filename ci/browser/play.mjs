@@ -6,7 +6,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const dir = path.resolve('files');
+const dir = path.resolve(process.env.MEDIA_DIR || 'files');
 const page = fs.readFileSync('page.html');
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
