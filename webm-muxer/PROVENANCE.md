@@ -34,9 +34,12 @@ same specifications.
 
 Used only as separate processes, to check the output:
 
-- `mkvalidator` (the Matroska project's validator), built from its
-  published release;
-- `ffprobe` and `ffmpeg` (FFmpeg command-line tools): structure, packet
+- `mkvalidator` 0.6.0 (the Matroska project's validator), built from its
+  published release tag (`mkvalidator-0.6.0`). A build of the source
+  repository's main branch crashed on every file, ffmpeg's own output
+  included, so the release is used;
+- `ffprobe` and `ffmpeg` (FFmpeg command-line tools, a static Linux
+  build of the development branch): structure, packet
   timestamps, keyframe flags, seeking to each keyframe, and decoding of
   whole and cut-off files. `ffmpeg` also encoded test inputs (VP9, AV1,
   Opus and Vorbis) into IVF and Ogg files, which the test tool reads;
