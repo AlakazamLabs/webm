@@ -1,0 +1,23 @@
+[package]
+name = "webm-muxer-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+webm-muxer = { path = "../webm-muxer" }
+
+[[bin]]
+name = "api"
+path = "fuzz_targets/api.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

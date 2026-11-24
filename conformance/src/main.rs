@@ -68,6 +68,7 @@ enum Spec {
 
 /// One stream to mux: its track, its packets, and per-packet options.
 struct Stream {
+    delay_ns: u64,
     codec: &'static str,
     spec: Spec,
     packets: Vec<Packet>,
@@ -91,6 +92,8 @@ struct Written {
     /// (track number, ticks, keyframe), in file order.
     frames: Vec<(u64, u64, bool)>,
     codecs: Vec<&'static str>,
+    /// Per track: the CodecDelay ffprobe subtracts from its timestamps.
+    delays_ns: Vec<u64>,
     has_video: bool,
 }
 
@@ -153,6 +156,7 @@ fn mux(case: Case, out_dir: &Path) -> Result<Written, String> {
     }
     let codecs = case.streams.iter().map(|s| s.codec).collect();
     let has_video = case.streams.iter().any(|s| matches!(s.spec, Spec::Video(_)));
+    let delays_ns = case.streams.iter().map(|s| s.delay_ns).collect();
     let path = out_dir.join(format!("{}.webm", case.name));
     std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
     Ok(Written {
@@ -164,6 +168,7 @@ fn mux(case: Case, out_dir: &Path) -> Result<Written, String> {
         frames,
         codecs,
         has_video,
+        delays_ns,
     })
 }
 
@@ -210,6 +215,7 @@ fn video(codec: VideoCodec, packets: Vec<Packet>, cp: Option<Vec<u8>>) -> Stream
         _ => "av1",
     };
     Stream {
+        delay_ns: 0,
         codec: name,
         spec: Spec::Video(t),
         packets,
@@ -245,13 +251,16 @@ fn cases(tools: &Tools, inp: &inputs::Inputs) -> Result<Vec<Case>, String> {
     let (vorbis_headers, vorbis, _rate) = inputs::vorbis(&inp.dir.join("vorbis.ogg"))?;
     let vp9_cp = vp9_codec_private(Some(0), None, Some(8), Some(0));
 
+    let opus_pre_skip = u64::from(u16::from_le_bytes([opus_head[10], opus_head[11]]));
     let opus_s = || Stream {
+        delay_ns: opus_pre_skip * 1_000_000_000 / 48_000,
         codec: "opus",
         spec: Spec::Audio(AudioTrack::opus_with_head(opus_head.clone())),
         packets: opus.clone(),
         extra: Vec::new(),
     };
     let vorbis_s = || Stream {
+        delay_ns: 0,
         codec: "vorbis",
         spec: Spec::Audio(AudioTrack::vorbis(
             vorbis_headers[0].clone(),
@@ -406,8 +415,9 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
     }
     let (ok, out, err) = run(cmd.arg(&w.path));
     let text = format!("{out}{err}");
-    let errs: Vec<&str> = text.lines().filter(|l| l.starts_with("ERR")).collect();
-    let wrns: Vec<&str> = text.lines().filter(|l| l.starts_with("WRN")).collect();
+    let _ = std::fs::write(work.join(format!("{}.mkvalidator.txt", w.name)), &text);
+    let errs: Vec<&str> = text.lines().map(str::trim).filter(|l| l.starts_with("ERR")).collect();
+    let wrns: Vec<&str> = text.lines().map(str::trim).filter(|l| l.starts_with("WRN")).collect();
     let mut note = format!("{} ERR, {} WRN", errs.len(), wrns.len());
     for l in errs.iter().chain(&wrns).take(6) {
         let _ = write!(note, " | {l}");
@@ -441,7 +451,8 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
         let si: u64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(u64::MAX);
         let pts: f64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(-1.0);
         let key = parts.next().is_some_and(|f| f.contains('K'));
-        let ticks = (pts * 1e9 / w.scale as f64).round() as u64;
+        let delay = w.delays_ns.get(si as usize).copied().unwrap_or(0);
+        let ticks = ((pts * 1e9 + delay as f64) / w.scale as f64).round() as u64;
         if si + 1 != want.0 || ticks != want.1 || key != want.2 {
             mismatch = Some(format!("packet {i}: got {l}, want {want:?}"));
             break;
@@ -592,7 +603,8 @@ fn row_cuts(tools: &Tools, w: &Written, work: &Path, row: &mut Row) {
             .lines()
             .filter_map(|l| l.trim().trim_end_matches(',').parse().ok())
             .collect();
-        let ok = got.len() == ntracks && got.iter().zip(&need).all(|(g, n)| g >= n);
+        let nothing_needed = need.iter().all(|&n| n == 0);
+        let ok = nothing_needed || (got.len() == ntracks && got.iter().zip(&need).all(|(g, n)| g >= n));
         if ok {
             good += 1;
         } else if notes.len() < 3 {
