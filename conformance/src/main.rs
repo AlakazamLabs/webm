@@ -197,11 +197,11 @@ fn vp8_stream(count: usize) -> Vec<Packet> {
             for x in 0..w {
                 let bx = (x + i * 3) / 40;
                 let by = y / 40;
-                buf[y * w + x] = if (bx + by) % 2 == 0 { 200 } else { 40 };
+                buf[y * w + x] = if (bx + by).is_multiple_of(2) { 200 } else { 40 };
             }
         }
         for c in 0..w * h / 2 {
-            buf[w * h + c] = (100 + (i % 60) as u8) as u8;
+            buf[w * h + c] = 100 + (i % 60) as u8;
         }
         let pic = Picture::from_i420(&buf, 320, 240).expect("picture");
         let n = out.len();

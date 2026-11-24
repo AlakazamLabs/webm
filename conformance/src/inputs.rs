@@ -192,10 +192,13 @@ impl Inputs {
 /// The packets of an Ogg file's single logical stream, each with the
 /// granule position of the page it completes on, if it is the last packet
 /// completed there.
-pub fn ogg_packets(path: &Path) -> Result<Vec<(Vec<u8>, Option<i64>)>, String> {
+/// An Ogg packet and the granule position of the page it ends.
+pub type OggPacket = (Vec<u8>, Option<i64>);
+
+pub fn ogg_packets(path: &Path) -> Result<Vec<OggPacket>, String> {
     let b = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut at = 0;
-    let mut out: Vec<(Vec<u8>, Option<i64>)> = Vec::new();
+    let mut out: Vec<OggPacket> = Vec::new();
     let mut partial: Vec<u8> = Vec::new();
     while at < b.len() {
         if b.len() < at + 27 || &b[at..at + 4] != b"OggS" {
@@ -248,7 +251,10 @@ pub fn opus(path: &Path) -> Result<(Vec<u8>, Vec<Packet>, u64), String> {
 
 /// Vorbis: the three headers and the audio packets, timed by spreading
 /// each page's packets evenly over its granule span.
-pub fn vorbis(path: &Path) -> Result<([Vec<u8>; 3], Vec<Packet>, u32), String> {
+/// Vorbis's three headers, its audio packets and its sample rate.
+pub type VorbisStream = ([Vec<u8>; 3], Vec<Packet>, u32);
+
+pub fn vorbis(path: &Path) -> Result<VorbisStream, String> {
     let pk = ogg_packets(path)?;
     if pk.len() < 4 || pk[0].0.get(1..7) != Some(b"vorbis") {
         return Err("no Vorbis headers".into());
