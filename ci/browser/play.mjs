@@ -39,10 +39,13 @@ await new Promise((r) => server.listen(Number(process.env.PORT || 0), '127.0.0.1
 const base = `http://127.0.0.1:${server.address().port}/`;
 
 const files = fs.readdirSync(dir).filter((f) => f.endsWith('.webm')).sort();
+const wanted = (process.env.BROWSERS || 'chromium,firefox').split(',');
 const browsers = [
   ['chromium', () => chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] })],
   ['firefox', () => firefox.launch({ firefoxUserPrefs: { 'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0 } })],
-];
+].filter(([name]) => wanted.includes(name));
+const within = (ms, what, p) =>
+  Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(`${what}: no answer in ${ms} ms`)), ms))]);
 let failed = 0;
 let passed = 0;
 for (const [name, launch] of browsers) {
@@ -53,17 +56,18 @@ for (const [name, launch] of browsers) {
     const runs = [null];
     if (f.includes('.file.')) runs.push(3.2);
     for (const seek of runs) {
-      const p = await browser.newPage();
       const q = `?f=${encodeURIComponent(f)}` + (seek === null ? '' : `&seek=${seek}`);
       let r;
+      let p = null;
       try {
+        p = await within(30000, 'newPage', browser.newPage());
         await p.goto(base + q);
         await p.waitForFunction(() => window.result, null, { timeout: 30000 });
         r = await p.evaluate(() => window.result);
       } catch (e) {
         r = { done: 'timeout', note: String(e).split('\n')[0] };
       }
-      await p.close();
+      if (p) await within(10000, 'close', p.close()).catch(() => {});
       const problems = [];
       if (r.done !== 'ended') problems.push(`ended: ${r.done} ${JSON.stringify(r.error || r.playError || r.note || '')}`);
       if (r.done === 'ended' && Math.abs(r.currentTime - 6) > 0.3) problems.push(`ended at ${r.currentTime}`);

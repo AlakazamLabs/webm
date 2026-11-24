@@ -7,6 +7,6 @@ set -euo pipefail
 cd ci/browser
 export PLAYWRIGHT_BROWSERS_PATH="${K2_JOB_CACHE:-$PWD/.cache}/pw-browsers"
 npm install --no-audit --no-fund --silent
-npx playwright install chromium firefox
+npx playwright install ${BROWSERS:+$(echo "$BROWSERS" | tr , ' ')}${BROWSERS:-chromium firefox}
 ls files | wc -l | xargs echo "files:"
 node play.mjs
