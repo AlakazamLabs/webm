@@ -552,11 +552,12 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
                 }
                 let want_key = !w.has_video || first.contains('K');
                 // Video: exactly the keyframe. Audio-only: a packet from
-                // the cue point up to the target.
+                // the cue point up to the target (ffprobe may skip the packet
+                // whose start, less CodecDelay, falls before it).
                 let hit = if w.has_video {
                     (pts - t).abs() < 0.0015
                 } else {
-                    pts > t - 0.0015 && pts <= target + 0.0015
+                    pts > t - 0.0015 && pts <= target + 0.0215
                 };
                 if ok && hit && want_key {
                     good += 1;

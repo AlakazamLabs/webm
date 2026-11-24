@@ -18,17 +18,18 @@ fi
 export FFMPEG="$ff/bin/ffmpeg" FFPROBE="$ff/bin/ffprobe"
 "$FFPROBE" -version | head -1
 
-mkv="$cache/mkvalidator-bin"
+mkv_tag="${MKVALIDATOR_TAG:-mkvalidator-0.6.0}"
+mkv="$cache/$mkv_tag-bin"
 if [ ! -x "$mkv" ]; then
   rm -rf "$cache/foundation-source" "$cache/mkv-build"
-  git clone -q --depth 1 https://github.com/Matroska-Org/foundation-source "$cache/foundation-source"
+  git clone -q --depth 1 --branch "$mkv_tag" https://github.com/Matroska-Org/foundation-source "$cache/foundation-source"
   cmake -S "$cache/foundation-source" -B "$cache/mkv-build" -DCMAKE_BUILD_TYPE=Release >/dev/null
   cmake --build "$cache/mkv-build" --target mkvalidator -j 4 >/dev/null
   cp "$(find "$cache/mkv-build" -type f -name mkvalidator -perm -u+x | head -1)" "$mkv"
-  (cd "$cache/foundation-source" && echo "mkvalidator source commit: $(git rev-parse HEAD)") > "$cache/mkvalidator.version"
+  (cd "$cache/foundation-source" && echo "mkvalidator source commit: $(git rev-parse HEAD)") > "$cache/$mkv_tag.version"
 fi
 export MKVALIDATOR="$mkv"
-cat "$cache/mkvalidator.version"
+cat "$cache/$mkv_tag.version"
 
 cargo build --release -p webm-conformance
 rm -rf out && mkdir -p out
