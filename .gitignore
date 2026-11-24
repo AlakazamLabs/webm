@@ -5,3 +5,5 @@
 /out
 /ci/browser/node_modules
 /ci/browser/media
+/ci/browser/files
+/.ci-cache

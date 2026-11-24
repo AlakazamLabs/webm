@@ -2,9 +2,10 @@
 # Runs the conformance tool against outside oracles, on a Linux x86_64 node:
 # a static FFmpeg build (ffmpeg, ffprobe) and mkvalidator built from the
 # Matroska project's published source. Both run only as separate
-# processes; their source is never read. Cached in $K2_JOB_CACHE when set.
+# processes; their source is never read. Cached in $WEBM_CI_CACHE
+# (default .ci-cache in the repo).
 set -euo pipefail
-cache="${K2_JOB_CACHE:-$PWD/.oracle-cache}"
+cache="${WEBM_CI_CACHE:-$PWD/.ci-cache}/oracles"
 mkdir -p "$cache"
 
 ff="$cache/ffmpeg"
