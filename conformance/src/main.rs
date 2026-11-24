@@ -428,7 +428,10 @@ fn verify(tools: &Tools, w: &Written, work: &Path, mkv_live_flag: bool) -> Row {
     }
     let (ok, out, err, code) = run_code(cmd.arg(&w.path));
     let text = format!("{out}{err}");
-    let _ = std::fs::write(work.join(format!("{}.mkvalidator.txt", w.name)), format!("exit {code}\n{text}"));
+    let _ = std::fs::write(
+        work.join(format!("{}.mkvalidator.txt", w.name)),
+        format!("exit {code}\n{text}"),
+    );
     let errs: Vec<&str> = text.lines().map(str::trim).filter(|l| l.starts_with("ERR")).collect();
     let wrns: Vec<&str> = text.lines().map(str::trim).filter(|l| l.starts_with("WRN")).collect();
     let mut note = format!("exit {code}, {} ERR, {} WRN", errs.len(), wrns.len());
