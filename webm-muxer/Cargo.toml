@@ -1,0 +1,23 @@
+[package]
+name = "webm-muxer"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT OR Apache-2.0"
+description = "A WebM writer (muxer) in pure, safe Rust: VP8, VP9, AV1, Opus and Vorbis tracks, live streaming or seekable files with Cues."
+authors = ["Alakazam Labs"]
+readme = "README.md"
+repository = "https://github.com/AlakazamLabs/webm"
+homepage = "https://github.com/AlakazamLabs/webm/tree/main/webm-muxer"
+documentation = "https://docs.rs/webm-muxer"
+keywords = ["webm", "matroska", "muxer", "video", "opus"]
+categories = ["multimedia::video", "multimedia::audio", "multimedia::encoding"]
+include = ["/src/", "/README.md", "/CHANGELOG.md", "/PROVENANCE.md", "/LICENSE-MIT", "/LICENSE-APACHE"]
+
+[dependencies]
+
+[dev-dependencies]
+vp8-encoder = "0.1"
+
+[lints.rust]
+missing_docs = "warn"

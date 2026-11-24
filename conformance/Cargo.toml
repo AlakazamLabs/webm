@@ -1,0 +1,11 @@
+[package]
+name = "webm-conformance"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "Test tool: muxes test media with webm-muxer and checks it against outside validators and players."
+
+[dependencies]
+webm-muxer = { path = "../webm-muxer" }
+vp8-encoder = "0.1"

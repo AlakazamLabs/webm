@@ -1,0 +1,4 @@
+[workspace]
+members = ["webm-muxer", "conformance"]
+exclude = ["fuzz"]
+resolver = "2"

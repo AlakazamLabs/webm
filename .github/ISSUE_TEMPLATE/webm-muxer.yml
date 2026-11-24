@@ -1,0 +1,23 @@
+name: webm-muxer
+description: A bug or a request for the webm-muxer crate
+labels: ["webm-muxer"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Crate version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead. For files that don't play, say which player and how the file was made.
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code or steps to reproduce
+      render: rust
