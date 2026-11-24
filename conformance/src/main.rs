@@ -96,7 +96,7 @@ struct Written {
 
 fn mux(case: Case, out_dir: &Path) -> Result<Written, String> {
     let scale = case.scale;
-    let mut order: Vec<(u64, usize, usize, bool)> = Vec::new(); // (ticks, video-first, stream, packet)
+    let mut order: Vec<(u64, u8, usize, usize)> = Vec::new(); // (ticks, video first, stream, packet)
     for (si, s) in case.streams.iter().enumerate() {
         let video = matches!(s.spec, Spec::Video(_));
         for (pi, p) in s.packets.iter().enumerate() {
